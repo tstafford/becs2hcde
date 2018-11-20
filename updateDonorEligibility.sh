@@ -78,10 +78,12 @@ fi
 
 if [ "$1" == "init" ]
 then
-	mysql -h"$mysql_host" -u"$mysql_username" -p"$mysql_password" "$mysql_database" -e "CREATE TABLE \`DonorEligibility\` ( \`becs_id\` int(11) unsigned NOT NULL, \`procedure\` enum('WB','2RBC','PLT','PLS') CHARACTER SET ascii COLLATE ascii_bin NOT NULL, \`eligible_date\` date NOT NULL,
- \`updated\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (\`becs_id\`,\`procedure\`)) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-
-CREATE TABLE `Incoming` ( `becs_id` int(11) unsigned NOT NULL, `procedure` enum('WB','2RBC','PLT','PLS') CHARACTER SET ascii COLLATE ascii_bin NOT NULL, `eligible_date` varchar(10) CHARACTER SET ascii COLLATE ascii_bin NOT NULL, PRIMARY KEY (`becs_id`,`procedure`)) ENGINE=InnoDB DEFAULT CHARSET=latin1;"
+	cat << EOM | mysql -h"$mysql_host" -u"$mysql_username" -p"$mysql_password" "$mysql_database" 
+CREATE TABLE \`DonorEligibility\` ( \`becs_id\` int(11) unsigned NOT NULL, \`procedure\` enum('WB','2RBC','PLT','PLS') CHARACTER SET ascii COLLATE ascii_bin NOT NULL, \`eligible_date\` date NOT NULL, \`updated\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (\`becs_id\`,\`procedure\`)) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+EOM
+	cat << EOM | mysql -h"$mysql_host" -u"$mysql_username" -p"$mysql_password" "$mysql_database"
+CREATE TABLE \`Incoming\` ( \`becs_id\` int(11) unsigned NOT NULL, \`procedure\` enum('WB','2RBC','PLT','PLS') CHARACTER SET ascii COLLATE ascii_bin NOT NULL, \`eligible_date\` varchar(10) CHARACTER SET ascii COLLATE ascii_bin NOT NULL, PRIMARY KEY (\`becs_id\`,\`procedure\`)) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+EOM
 fi
 
 
