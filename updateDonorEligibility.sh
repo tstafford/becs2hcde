@@ -1,5 +1,18 @@
 #!/bin/bash
-bbcs_data=$(mktemp)
+#	This program is free software: you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation, either version 3 of the License, or
+#	(at your option) any later version.
+#
+#	This program is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
+#
+#	You should have received a copy of the GNU General Public License
+#	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+becs_data=$(mktemp)
 mysql_data=$(mktemp)
 
 # check that the config file exists
@@ -13,16 +26,16 @@ fi
 # called to exit with a friendly message
 quit() {
         [[ "$locked" == "true" ]] && rmdir "$lock_file"
-	rm "$bbcs_data"
+	rm "$becs_data"
 	rm "$mysql_data"
         echo $*
         exit
 }
 
 #pre-flight check
-if [ -z "$bbcs_dsn" ]
+if [ -z "$becs_dsn" ]
 then
-	quit "bbcs_dsn variable not set, check config.sh"
+	quit "becs_dsn variable not set, check config.sh"
 fi
 if [ -z "$mysql_dsn" ]
 then
@@ -48,6 +61,10 @@ if [ -z "$pdid_pls" ]
 then
 	quit "pdid_pls not set, check config.sh"
 fi
+if ! which mysql
+then
+	quit "mysql was not found"
+fi
 
 # if everything is ok, the last thing we do is lock
 if mkdir "$lock_file"
@@ -59,12 +76,19 @@ else
 fi
 #end pre-flight check
 
+if [ "$1" == "init" ]
+then
+	mysql -h"$mysql_host" -u"$mysql_username" -p"$mysql_password" "$mysql_database" -e "CREATE TABLE \`DonorEligibility\` ( \`becs_id\` int(11) unsigned NOT NULL, \`procedure\` enum('WB','2RBC','PLT','PLS') CHARACTER SET ascii COLLATE ascii_bin NOT NULL, \`eligible_date\` date NOT NULL,
+ \`updated\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, PRIMARY KEY (\`becs_id\`,\`procedure\`)) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+
+CREATE TABLE `Incoming` ( `becs_id` int(11) unsigned NOT NULL, `procedure` enum('WB','2RBC','PLT','PLS') CHARACTER SET ascii COLLATE ascii_bin NOT NULL, `eligible_date` varchar(10) CHARACTER SET ascii COLLATE ascii_bin NOT NULL, PRIMARY KEY (`becs_id`,`procedure`)) ENGINE=InnoDB DEFAULT CHARSET=latin1;"
+fi
+
 
 # query the iseries and then load them into the incoming table on the interim database
 # query to get product eligibility
 # ProductEligibility pe, Deferrals d
-echo "fetching becs data"
-cat << EOM | tr '\n' ' ' | isql iseries -v -b -x0x09 > "$bbcs_data"
+cat << EOM | tr '\n' ' ' | isql iseries -v -b -x0x09 > "$becs_data"
 SELECT final.actno,
        final.prod,
        CASE
@@ -147,13 +171,12 @@ OR     (
        AND    final.defer_date = '0000-00-00')
 EOM
 
-echo "updating idb"
-mysql --local-infile=1 -h"$mysql_host" -u"$mysql_username" -p"$mysql_password" "$mysql_database" -e "LOAD DATA LOCAL INFILE '$bbcs_data' replace INTO TABLE Incoming;
+mysql --local-infile=1 -h"$mysql_host" -u"$mysql_username" -p"$mysql_password" "$mysql_database" -e "LOAD DATA LOCAL INFILE '$becs_data' replace INTO TABLE Incoming;
 insert into DonorEligibility (becs_id,\`procedure\`,eligible_date) select i.becs_id, i.\`procedure\`, i.eligible_date from Incoming i left join DonorEligibility de on i.becs_id=de.becs_id and i.\`procedure\`=de.\`procedure\` where i.eligible_date != de. eligible_date or de.eligible_date is null on duplicate key update becs_id=i.becs_id, \`procedure\`=i.\`procedure\`, eligible_date=i.eligible_date, updated=CURRENT_TIMESTAMP;
 "
 
 if ! [ -z "$save_file" ] 
 then
 	echo "save file was set" 
-	cp -v "$bbcs_data" "$save_file"
+	cp -v "$becs_data" "$save_file"
 fi
